@@ -1,7 +1,10 @@
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::{
+    prelude::*, render::texture::ImageSettings,
+    sprite::Anchor,
+};
 use bevy_asset_loader::prelude::*;
 use bevy_rapier2d::prelude::*;
-use noise::{BasicMulti, NoiseFn};
+use floppy_corgi::pipes::{Pipe, PointsGate, SpawnPipe};
 
 fn main() {
     App::new()
@@ -11,7 +14,11 @@ fn main() {
             height: 600.0,
             ..Default::default()
         })
+        .init_resource::<Score>()
+        .insert_resource(ClearColor(Color::rgb(0.0, 42.0/255.0, 0.0)))
+        .insert_resource(ImageSettings::default_nearest())
         .add_plugins(DefaultPlugins)
+        .init_resource::<NumPipesToSpawn>()
         .add_loading_state(
             LoadingState::new(MyStates::AssetLoading)
                 .continue_to_state(MyStates::Next)
@@ -23,12 +30,14 @@ fn main() {
                 .with_system(setup),
         )
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(RapierDebugRenderPlugin::default())
-        .add_system(animate_sprite)
-        .add_system(corgi_control)
-        .add_system(align_to_window)
-        .add_system(display_events)
-        .add_system(display_intersection_info)
+        // .add_plugin(RapierDebugRenderPlugin::default())
+        .add_system_set(SystemSet::on_update(MyStates::Next)
+            .with_system(animate_sprite)
+            .with_system(corgi_control)
+            .with_system(align_to_window)
+            .with_system(display_events)
+            .with_system(despawn_pipes)
+        )
         .run();
 }
 
@@ -42,6 +51,10 @@ struct MyAssets {
     ))]
     #[asset(path = "corgi.png")]
     corgi: Handle<TextureAtlas>,
+    #[asset(path = "hill_large.png")]
+    hill: Handle<Image>,
+    #[asset(path = "backgroundColorGrass.png")]
+    background: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -50,31 +63,46 @@ struct Corgi;
 #[derive(Component)]
 struct Ground;
 
-#[derive(Component)]
-struct PipeDespawnArea;
+struct NumPipesToSpawn(u32);
 
-#[derive(Component)]
-struct Pipe;
+#[derive(Default)]
+struct Score(u32);
 
-#[derive(Component)]
-struct PipeTop;
+impl FromWorld for NumPipesToSpawn {
+    fn from_world(world: &mut World) -> Self {
+        let window = world
+            .get_resource::<Windows>()
+            .unwrap()
+            .primary();
 
-#[derive(Component)]
-struct PipeBottom;
+        let num_pipes = (window.width() / 400.0) as u32;
 
-#[derive(Component)]
-struct PointsGate;
+        NumPipesToSpawn(num_pipes + 1)
+    }
+}
 
 fn setup(
     mut commands: Commands,
     windows: Res<Windows>,
     assets: Res<MyAssets>,
+    num_pipes: Res<NumPipesToSpawn>,
 ) {
     let window = windows.primary();
 
-    commands.spawn_bundle(Camera2dBundle::default());
+    let mut camera = Camera2dBundle::default();
+    camera.projection.scale = 1.0;
+    commands.spawn_bundle(camera);
 
     let sprite_size = 100.0;
+
+    commands.spawn_bundle(SpriteBundle {
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(1920.0, 1080.0)),
+            ..Default::default()
+        },
+        texture: assets.background.clone(),
+        ..Default::default()
+    });
 
     commands
         .spawn_bundle(SpriteSheetBundle {
@@ -119,7 +147,7 @@ fn setup(
     commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
-                color: Color::DARK_GREEN,
+                color: Color::rgb(0.14, 0.75, 0.46),
                 custom_size: Some(Vec2::new(
                     ground_size.x,
                     ground_size.y,
@@ -141,123 +169,16 @@ fn setup(
         ))
         .insert(Ground);
 
-    // pipe despawn area
-    let pipe_despawn_area =
-        Vec2::new(window.width() / 20.0, window.height());
-    commands
-        .spawn_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: Color::RED,
-                custom_size: Some(Vec2::new(
-                    pipe_despawn_area.x,
-                    pipe_despawn_area.y,
-                )),
-                ..default()
-            },
+    for index in 0..(num_pipes.0) {
+        commands.add(SpawnPipe {
+            image: assets.hill.clone(),
             transform: Transform::from_xyz(
-                -window.width() / 2.0
-                    - pipe_despawn_area.x / 2.0,
+                200.0 + 400.0 * index as f32,
                 0.0,
                 1.0,
             ),
-            ..default()
-        })
-        .insert(Sensor)
-        .insert(Collider::cuboid(
-            pipe_despawn_area.x / 2.0,
-            pipe_despawn_area.y / 2.0,
-        ))
-        .insert(ActiveEvents::COLLISION_EVENTS)
-        .insert(PipeDespawnArea);
-
-    // Pipe
-    let pipe_size = Vec2::new(200.0, window.height() / 2.0);
-    let noise = BasicMulti::new();
-    let center_of_opening = noise.get([1.0 / 0.02, 0.0]);
-    let gap_size = 300.0;
-
-    commands
-        .spawn_bundle(SpatialBundle {
-            transform: Transform::from_xyz(200.0, 0.0, 1.0),
-            visibility: Visibility { is_visible: true },
-            ..default()
-        })
-        .insert(RigidBody::KinematicVelocityBased)
-        .insert(Velocity::linear(Vec2::new(-100.0, 0.0)))
-        .with_children(|builder| {
-            // top pipe
-            builder
-                .spawn_bundle(SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::SEA_GREEN,
-                        custom_size: Some(Vec2::new(
-                            pipe_size.x,
-                            pipe_size.y,
-                        )),
-                        ..default()
-                    },
-                    transform: Transform::from_xyz(
-                        0.0,
-                        pipe_size.y / 2.0 + gap_size / 2.0,
-                        1.0,
-                    ),
-                    ..default()
-                })
-                .insert(Collider::cuboid(
-                    pipe_size.x / 2.0,
-                    pipe_size.y / 2.0,
-                ))
-                .insert(ActiveEvents::COLLISION_EVENTS)
-                .insert(PipeTop);
-
-            // Gap Sensor
-            builder
-                .spawn_bundle(SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::GREEN,
-                        custom_size: Some(Vec2::new(
-                            10.0, gap_size,
-                        )),
-                        ..default()
-                    },
-                    transform: Transform::from_xyz(
-                        0.0, 0.0, 1.0,
-                    ),
-                    ..default()
-                })
-                .insert(Sensor)
-                .insert(Collider::cuboid(
-                    5.0,
-                    gap_size / 2.0,
-                ))
-                .insert(PointsGate)
-                .insert(ActiveEvents::COLLISION_EVENTS);
-
-            // bottom pipe
-            builder
-                .spawn_bundle(SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::SEA_GREEN,
-                        custom_size: Some(Vec2::new(
-                            pipe_size.x,
-                            pipe_size.y,
-                        )),
-                        ..default()
-                    },
-                    transform: Transform::from_xyz(
-                        0.0,
-                        -pipe_size.y / 2.0 - gap_size / 2.0,
-                        1.0,
-                    ),
-                    ..default()
-                })
-                .insert(Collider::cuboid(
-                    pipe_size.x / 2.0,
-                    pipe_size.y / 2.0,
-                ))
-                .insert(PipeBottom);
-        })
-        .insert(Pipe);
+        });
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -293,14 +214,20 @@ fn animate_sprite(
 }
 
 fn corgi_control(
-    mut corgi: Query<&mut ExternalImpulse, With<Corgi>>,
+    mut corgi: Query<
+        (&mut Velocity, &mut ExternalImpulse),
+        With<Corgi>,
+    >,
     buttons: Res<Input<MouseButton>>,
 ) {
     if buttons.any_just_pressed([
         MouseButton::Left,
         MouseButton::Right,
     ]) {
-        corgi.single_mut().impulse = Vect::new(0.0, 200.0);
+        let (mut velocity, mut impulse) =
+            corgi.single_mut();
+        impulse.impulse = Vect::new(0.0, 200.0);
+        velocity.linvel = Vec2::new(0.0, 0.0);
     }
 }
 
@@ -347,36 +274,54 @@ fn align_to_window(
 /* A system that displays the events. */
 fn display_events(
     mut collision_events: EventReader<CollisionEvent>,
+    gates: Query<Entity, With<PointsGate>>,
+    corgi: Query<Entity, With<Corgi>>,
+    mut score: ResMut<Score>,
 ) {
     for collision_event in collision_events.iter() {
-        println!(
-            "Received collision event: {:?}",
-            collision_event
-        );
+        let corgi = corgi.single();
+        match collision_event {
+            CollisionEvent::Started(a, b, _flags) => {
+                if let Some((_corgi, other)) =
+                    if corgi == *a {
+                        Some((a, b))
+                    } else if corgi == *b {
+                        Some((b, a))
+                    } else {
+                        None
+                    }
+                {
+                    if let Ok(_gate_entity) =
+                        gates.get(*other)
+                    {
+                        score.0 += 1;
+                    }
+                }
+            }
+            CollisionEvent::Stopped(_a, _b, _flags) => {}
+        }
     }
 }
 
-fn display_intersection_info(
+fn despawn_pipes(
     mut commands: Commands,
-    mut gates: Query<
-        (Entity, &Parent, &mut Transform),
-        (With<PointsGate>, Without<Pipe>),
-    >,
-    mut pipes: Query<&mut Transform, With<Pipe>>,
-    pipe_despawn_area: Query<Entity, With<PipeDespawnArea>>,
-    rapier_context: Res<RapierContext>,
+    pipes: Query<(Entity, &Transform), With<Pipe>>,
+    windows: Res<Windows>,
+    assets: Res<MyAssets>,
 ) {
-    for mut gate in gates.iter_mut() {
-        let despawn = pipe_despawn_area.single();
+    let window = windows.primary();
+    for (entity, transform) in pipes.iter() {
+        if transform.translation.x < -window.width() / 2.0 {
+            commands.entity(entity).despawn_recursive();
 
-        if let Some(value) = rapier_context
-            .intersection_pair(gate.0, despawn)
-        {
-            dbg!(value);
-            println!("The entities {:?} and {:?} have intersecting colliders!",gate.0, despawn);
-            let mut transform =
-                pipes.get_mut(gate.1.get()).unwrap();
-            transform.translation.x = 500.0;
+            commands.add(SpawnPipe {
+                image: assets.hill.clone(),
+                transform: Transform::from_xyz(
+                    window.width() - 200.0,
+                    0.0,
+                    1.0,
+                ),
+            });
         }
     }
 }
