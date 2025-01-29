@@ -4,7 +4,7 @@ use bevy::{
     math::bounding::{Aabb2d, IntersectsVolume},
     prelude::*,
     render::camera::ScalingMode,
-    sprite::Anchor,
+    sprite::{Anchor, Material2dPlugin},
     time::common_conditions::on_timer,
     window::PrimaryWindow,
 };
@@ -13,6 +13,7 @@ use bevy_transform_interpolation::prelude::{
     TransformInterpolation, TransformInterpolationPlugin,
 };
 use floppy_corgi::{
+    background_material::BackgroundMaterial,
     pipes::{
         EndGame, Pipe, PipeBottom, PipeTop, PointsGate,
         ScorePoint, Scored, SpawnPipe,
@@ -35,6 +36,8 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
             TransformInterpolationPlugin::default(),
+            Material2dPlugin::<BackgroundMaterial>::default(
+            ),
         ))
         .add_loading_state(
             LoadingState::new(MyStates::AssetLoading)
@@ -88,6 +91,7 @@ struct MyAssets {
     hill: Handle<Image>,
 
     #[asset(path = "background_color_grass.png")]
+    #[asset(image(sampler(filter = nearest, wrap = repeat)))]
     background: Handle<Image>,
 }
 
@@ -109,7 +113,12 @@ struct Velocity(f32);
 #[derive(Component, Default)]
 struct Acceleration(f32);
 
-fn setup(mut commands: Commands, assets: Res<MyAssets>) {
+fn setup(
+    mut commands: Commands,
+    assets: Res<MyAssets>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<BackgroundMaterial>>,
+) {
     commands.spawn((
         Camera2d,
         OrthographicProjection {
@@ -120,12 +129,15 @@ fn setup(mut commands: Commands, assets: Res<MyAssets>) {
         },
     ));
 
-    commands.spawn(Sprite {
-        image: assets.background.clone(),
-        // the background is a square texture
-        custom_size: Some(Vec2::splat(CANVAS_SIZE.x)),
-        ..default()
-    });
+    commands.spawn((
+        Mesh2d(meshes.add(Rectangle::new(
+            CANVAS_SIZE.x,
+            CANVAS_SIZE.x,
+        ))),
+        MeshMaterial2d(materials.add(BackgroundMaterial {
+            color_texture: assets.background.clone(),
+        })),
+    ));
 
     commands.spawn((
         Sprite {
