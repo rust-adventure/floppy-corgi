@@ -1,8 +1,11 @@
 use std::time::Duration;
 
 use bevy::{
-    prelude::*, render::camera::ScalingMode,
-    sprite::Anchor, time::common_conditions::on_timer,
+    math::bounding::{Aabb2d, IntersectsVolume},
+    prelude::*,
+    render::camera::ScalingMode,
+    sprite::Anchor,
+    time::common_conditions::on_timer,
     window::PrimaryWindow,
 };
 use bevy_asset_loader::prelude::*;
@@ -11,7 +14,8 @@ use bevy_transform_interpolation::prelude::{
 };
 use floppy_corgi::{
     pipes::{
-        pipes_to_the_left, Pipe, PointsGate, SpawnPipe,
+        EndGame, Pipe, PipeBottom, PipeTop, PointsGate,
+        ScorePoint, Scored, SpawnPipe,
     },
     CANVAS_SIZE,
 };
@@ -45,6 +49,7 @@ fn main() {
                 animate_sprite,
                 corgi_control,
                 despawn_pipes,
+                check_collisions,
                 spawn_pipes.run_if(on_timer(
                     Duration::from_millis(1000),
                 )),
@@ -56,6 +61,12 @@ fn main() {
             (gravity, pipes_to_the_left)
                 .run_if(in_state(MyStates::Next)),
         )
+        .add_observer(|_trigger: Trigger<EndGame>| {
+            dbg!("trigger endgame");
+        })
+        .add_observer(|_trigger: Trigger<ScorePoint>| {
+            dbg!("trigger point");
+        })
         .run();
 }
 
@@ -283,3 +294,75 @@ fn spawn_pipes(
         ),
     });
 }
+
+const PIPE_SPEED: f32 = 200.;
+
+pub fn pipes_to_the_left(
+    mut pipes: Query<&mut Transform, With<Pipe>>,
+    time: Res<Time>,
+) {
+    for mut pipe in &mut pipes {
+        pipe.translation.x -=
+            PIPE_SPEED * time.delta_secs();
+    }
+}
+
+fn check_collisions(
+    mut commands: Commands,
+    corgi: Single<(&Sprite, &GlobalTransform), With<Corgi>>,
+    pipe_segments: Query<
+        (&GlobalTransform, &Sprite),
+        Or<(With<PipeTop>, With<PipeBottom>)>,
+    >,
+    pipe_gaps: Query<
+        (&GlobalTransform, &Sprite, Entity),
+        (With<PointsGate>, Without<Scored>),
+    >,
+    mut gizmos: Gizmos,
+) {
+    let corgi_collider = Aabb2d::new(
+        corgi.1.translation().truncate(),
+        corgi.1.scale().truncate() / 2.,
+    );
+    gizmos.rect_2d(
+        corgi.1.translation().truncate(),
+        corgi.0.custom_size.unwrap().xy(),
+        Color::BLACK,
+    );
+
+    for (pipe_transform, sprite) in &pipe_segments {
+        let pipe_collider = Aabb2d::new(
+            pipe_transform.translation().truncate(),
+            sprite.custom_size.unwrap().xy() / 2.,
+        );
+        gizmos.rect_2d(
+            pipe_transform.translation().xy(),
+            sprite.custom_size.unwrap().xy(),
+            Color::BLACK,
+        );
+        if corgi_collider.intersects(&pipe_collider) {
+            commands.trigger(EndGame);
+        }
+    }
+
+    for (pipe_transform, sprite, entity) in &pipe_gaps {
+        let pipe_collider = Aabb2d::new(
+            pipe_transform.translation().truncate(),
+            sprite.custom_size.unwrap().xy() / 2.,
+        );
+        gizmos.rect_2d(
+            pipe_transform.translation().xy(),
+            sprite.custom_size.unwrap().xy(),
+            Color::BLACK,
+        );
+        if corgi_collider.intersects(&pipe_collider) {
+            commands.trigger(ScorePoint);
+            commands.entity(entity).insert(Scored);
+        }
+    }
+}
+// BoundingCircle::new(ball_transform.translation.truncate(), BALL_DIAMETER / 2.),
+// Aabb2d::new(
+//     collider_transform.translation.truncate(),
+//     collider_transform.scale.truncate() / 2.,
+// ),

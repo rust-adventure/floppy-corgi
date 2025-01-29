@@ -1,7 +1,4 @@
-use bevy::{
-    color::palettes::css::SEA_GREEN, prelude::*,
-    window::PrimaryWindow,
-};
+use bevy::{color::palettes::css::SEA_GREEN, prelude::*};
 use bevy_transform_interpolation::prelude::TransformInterpolation;
 use noise::{BasicMulti, NoiseFn, Perlin};
 
@@ -20,6 +17,17 @@ pub struct PipeBottom;
 
 #[derive(Component)]
 pub struct PointsGate;
+
+#[derive(Component)]
+pub struct Scored;
+
+const GAP_SIZE: f32 = 125.0;
+
+#[derive(Event)]
+pub struct ScorePoint;
+
+#[derive(Event)]
+pub struct EndGame;
 
 pub struct SpawnPipe {
     pub transform: Transform,
@@ -40,8 +48,6 @@ impl Command for SpawnPipe {
         let position = (CANVAS_SIZE.y as f64 / 2.0)
             * center_of_opening;
 
-        let gap_size = 125.0;
-
         world
             .spawn((
                 self.transform,
@@ -51,10 +57,6 @@ impl Command for SpawnPipe {
                 },
                 TransformInterpolation,
             ))
-            // .insert(RigidBody::KinematicVelocityBased)
-            // .insert(Velocity::linear(Vec2::new(
-            //     -100.0, 0.0,
-            // )))
             .with_children(|builder| {
                 // top pipe
                 builder
@@ -72,7 +74,7 @@ impl Command for SpawnPipe {
                         Transform::from_xyz(
                             0.0,
                             (pipe_size.y / 2.0
-                                + gap_size / 2.0)
+                                + GAP_SIZE / 2.0)
                                 + position as f32,
                             1.0,
                         ),
@@ -94,7 +96,7 @@ impl Command for SpawnPipe {
                     Sprite {
                         color: Color::NONE,
                         custom_size: Some(Vec2::new(
-                            10.0, gap_size,
+                            10.0, GAP_SIZE,
                         )),
                         ..default()
                     },
@@ -108,7 +110,7 @@ impl Command for SpawnPipe {
                 ));
                 // .insert(Collider::cuboid(
                 //     5.0,
-                //     gap_size / 2.0,
+                //     GAP_SIZE / 2.0,
                 // ))
                 // .insert(ActiveEvents::COLLISION_EVENTS);
 
@@ -125,7 +127,7 @@ impl Command for SpawnPipe {
                     },
                     Transform::from_xyz(
                         0.0,
-                        -pipe_size.y / 2.0 - gap_size / 2.0
+                        -pipe_size.y / 2.0 - GAP_SIZE / 2.0
                             + position as f32,
                         1.0,
                     ),
@@ -142,17 +144,5 @@ impl Command for SpawnPipe {
                 // ))
                 // .insert(PipeBottom);
             });
-    }
-}
-
-const PIPE_SPEED: f32 = 200.;
-
-pub fn pipes_to_the_left(
-    mut pipes: Query<&mut Transform, With<Pipe>>,
-    time: Res<Time>,
-) {
-    for mut pipe in &mut pipes {
-        pipe.translation.x -=
-            PIPE_SPEED * time.delta_secs();
     }
 }
