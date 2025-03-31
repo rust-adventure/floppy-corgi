@@ -48,51 +48,35 @@ impl Command for SpawnPipe {
         let position = (CANVAS_SIZE.y as f64 / 2.0)
             * center_of_opening;
 
-        world
-            .spawn((
-                self.transform,
-                Visibility::Visible,
-                Pipe {
-                    noise: center_of_opening,
-                },
-                TransformInterpolation,
-            ))
-            .with_children(|builder| {
-                // top pipe
-                builder
-                    .spawn((
-                        Sprite {
-                            color: SEA_GREEN.into(),
-                            custom_size: Some(Vec2::new(
-                                pipe_size.x,
-                                pipe_size.y,
-                            )),
-                            flip_y: true,
-                            image: self.image.clone(),
-                            ..default()
-                        },
-                        Transform::from_xyz(
-                            0.0,
-                            (pipe_size.y / 2.0
-                                + GAP_SIZE / 2.0)
-                                + position as f32,
-                            1.0,
-                        ),
-                    ))
-                    // .insert(Collider::capsule(
-                    //     Vec2::new(0.0, -200.0),
-                    //     Vec2::new(0.0, pipe_size.y),
-                    //     100.0,
-                    // ))
-                    // // .insert(Collider::cuboid(
-                    // //     pipe_size.x / 2.0,
-                    // //     pipe_size.y / 2.0,
-                    // // ))
-                    // .insert(ActiveEvents::COLLISION_EVENTS)
-                    .insert(PipeTop);
-
-                // Gap Sensor
-                builder.spawn((
+        world.spawn((
+            self.transform,
+            Visibility::Visible,
+            Pipe {
+                noise: center_of_opening,
+            },
+            TransformInterpolation,
+            children![
+                (
+                    Sprite {
+                        color: SEA_GREEN.into(),
+                        custom_size: Some(Vec2::new(
+                            pipe_size.x,
+                            pipe_size.y,
+                        )),
+                        flip_y: true,
+                        image: self.image.clone(),
+                        ..default()
+                    },
+                    Transform::from_xyz(
+                        0.0,
+                        (pipe_size.y / 2.0
+                            + GAP_SIZE / 2.0)
+                            + position as f32,
+                        1.0,
+                    ),
+                    PipeTop
+                ),
+                (
                     Sprite {
                         color: Color::NONE,
                         custom_size: Some(Vec2::new(
@@ -107,15 +91,8 @@ impl Command for SpawnPipe {
                     ),
                     // Sensor,
                     PointsGate,
-                ));
-                // .insert(Collider::cuboid(
-                //     5.0,
-                //     GAP_SIZE / 2.0,
-                // ))
-                // .insert(ActiveEvents::COLLISION_EVENTS);
-
-                // bottom pipe
-                builder.spawn((
+                ),
+                (
                     Sprite {
                         color: SEA_GREEN.into(),
                         custom_size: Some(Vec2::new(
@@ -132,17 +109,8 @@ impl Command for SpawnPipe {
                         1.0,
                     ),
                     PipeBottom,
-                ));
-                // .insert(Collider::capsule(
-                //     Vec2::new(0.0, 200.0),
-                //     Vec2::new(0.0, -pipe_size.y),
-                //     100.0,
-                // ))
-                // .insert(Collider::cuboid(
-                //     pipe_size.x / 2.0,
-                //     pipe_size.y / 2.0,
-                // ))
-                // .insert(PipeBottom);
-            });
+                )
+            ],
+        ));
     }
 }

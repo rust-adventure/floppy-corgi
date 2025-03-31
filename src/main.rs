@@ -155,10 +155,6 @@ fn setup(
             0.1,
             TimerMode::Repeating,
         )),
-        // .insert(Collider::cuboid(
-        //     sprite_size / 2.0,
-        //     sprite_size / 2.0,
-        // ))
         TransformInterpolation,
         Corgi,
         Gravity,
@@ -194,17 +190,6 @@ fn setup(
         Transform::from_xyz(0.0, 0.0, -1.0),
         Ground,
     ));
-
-    for index in 0..10 {
-        // commands.queue(SpawnPipe {
-        //     image: assets.hill.clone(),
-        //     transform: Transform::from_xyz(
-        //         200.0 + 400.0 * index as f32,
-        //         0.0,
-        //         1.0,
-        //     ),
-        // });
-    }
 }
 
 #[derive(
