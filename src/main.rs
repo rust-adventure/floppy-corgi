@@ -13,12 +13,12 @@ use bevy_transform_interpolation::prelude::{
     TransformInterpolation, TransformInterpolationPlugin,
 };
 use floppy_corgi::{
+    CANVAS_SIZE,
     background_material::BackgroundMaterial,
     pipes::{
         EndGame, Pipe, PipeBottom, PipeTop, PointsGate,
         ScorePoint, Scored, SpawnPipe,
     },
-    CANVAS_SIZE,
 };
 
 fn main() {
@@ -121,12 +121,12 @@ fn setup(
 ) {
     commands.spawn((
         Camera2d,
-        OrthographicProjection {
+        Projection::Orthographic(OrthographicProjection {
             scaling_mode: ScalingMode::FixedHorizontal {
                 viewport_width: CANVAS_SIZE.x,
             },
             ..OrthographicProjection::default_2d()
-        },
+        }),
     ));
 
     commands.spawn((
@@ -275,8 +275,8 @@ fn corgi_control(
         MouseButton::Left,
         MouseButton::Right,
     ]) {
-        corgi.0 .0 = 200.;
-        corgi.1 .0 = 0.;
+        corgi.0.0 = 200.;
+        corgi.1.0 = 0.;
     }
 }
 
@@ -287,7 +287,7 @@ fn despawn_pipes(
 ) {
     for (entity, transform) in pipes.iter() {
         if transform.translation.x < -window.width() / 2.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }

@@ -1,15 +1,19 @@
 [package]
 name = "floppy-corgi"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.15.1"
-bevy_asset_loader = { version = "0.22.0", features = ["2d"] }
+bevy = "0.16.0-rc.2"
+# bevy_asset_loader = { version = "0.22.0", features = ["2d"] }
+bevy_asset_loader = { git = "https://github.com/NiklasEi/bevy_asset_loader.git", rev = "6963143", features = [
+    "2d",
+] }
 noise = "0.9.0"
-bevy_transform_interpolation = "0.1"
+# bevy_transform_interpolation = "0.1"
+bevy_transform_interpolation = { git = "https://github.com/Jondolf/bevy_transform_interpolation.git", rev = "dff607d" }
 
 # Idiomatic Bevy code often triggers these lints, and the CI workflow treats them as errors.
 # In some cases they may still signal poor code quality however, so consider commenting out these lines.
