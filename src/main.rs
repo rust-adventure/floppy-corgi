@@ -71,7 +71,6 @@ fn main() {
                         1.0,
                     ),
                     Velocity(0.),
-                    Acceleration(10.),
                 ));
             },
         )
@@ -95,9 +94,6 @@ struct Gravity;
 
 #[derive(Component, Default)]
 struct Velocity(f32);
-
-#[derive(Component, Default)]
-struct Acceleration(f32);
 
 #[derive(Event)]
 pub struct ScorePoint;
@@ -155,7 +151,6 @@ fn setup(
         Corgi,
         Gravity,
         Velocity(0.),
-        Acceleration(10.),
     ));
 
     commands
@@ -221,23 +216,16 @@ fn animate_sprite(
 
 fn gravity(
     mut transforms: Query<
-        (
-            &mut Transform,
-            &mut Velocity,
-            &mut Acceleration,
-        ),
+        (&mut Transform, &mut Velocity),
         With<Gravity>,
     >,
     time: Res<Time>,
 ) {
-    let gravity: f32 = -2000.;
+    let gravity: f32 = -1000.;
 
-    for (mut transform, mut velocity, mut acceleration) in
-        &mut transforms
-    {
-        acceleration.0 += gravity * time.delta_secs();
-
-        velocity.0 += acceleration.0 * time.delta_secs();
+    for (mut transform, mut velocity) in &mut transforms {
+        velocity.0 += gravity * time.delta_secs();
+        dbg!(velocity.0);
 
         transform.translation.y +=
             velocity.0 * time.delta_secs();
@@ -245,18 +233,14 @@ fn gravity(
 }
 
 fn corgi_control(
-    mut corgi: Single<
-        (&mut Velocity, &mut Acceleration),
-        With<Corgi>,
-    >,
+    mut corgi: Single<&mut Velocity, With<Corgi>>,
     buttons: Res<ButtonInput<MouseButton>>,
 ) {
     if buttons.any_just_pressed([
         MouseButton::Left,
         MouseButton::Right,
     ]) {
-        corgi.0.0 = 200.;
-        corgi.1.0 = 0.;
+        corgi.0 = 400.;
     }
 }
 
