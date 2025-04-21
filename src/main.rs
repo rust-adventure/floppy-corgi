@@ -1,16 +1,17 @@
 use bevy::{
     color::palettes::tailwind::*,
+    image::{
+        ImageLoaderSettings, ImageSampler,
+        ImageSamplerDescriptor,
+    },
     math::bounding::{Aabb2d, IntersectsVolume},
     prelude::*,
     render::camera::ScalingMode,
     sprite::Material2dPlugin,
 };
-use bevy_asset_loader::prelude::*;
-use bevy_transform_interpolation::prelude::{
-    TransformInterpolation, TransformInterpolationPlugin,
-};
+use bevy_transform_interpolation::prelude::TransformInterpolationPlugin;
 use floppy_corgi::{
-    CANVAS_SIZE, CORGI_SIZE, MyAssets,
+    CANVAS_SIZE, CORGI_SIZE,
     background_material::BackgroundMaterial,
     pipes::{PipeBottom, PipePlugin, PipeTop, PointsGate},
 };
@@ -28,26 +29,19 @@ fn main() {
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
-            TransformInterpolationPlugin::default(),
+            TransformInterpolationPlugin::interpolate_all(),
             Material2dPlugin::<BackgroundMaterial>::default(
             ),
             PipePlugin,
         ))
-        .add_loading_state(
-            LoadingState::new(AppState::AssetLoading)
-                .continue_to_state(AppState::Next)
-                .load_collection::<MyAssets>(),
-        )
-        .add_systems(OnEnter(AppState::Next), setup)
-        .init_state::<AppState>()
+        .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
                 animate_sprite,
                 corgi_control,
                 score_update,
-            )
-                .run_if(in_state(AppState::Next)),
+            ),
         )
         .add_systems(
             FixedUpdate,
@@ -55,8 +49,7 @@ fn main() {
                 gravity,
                 check_collisions,
                 check_in_bounds,
-            )
-                .run_if(in_state(AppState::Next)),
+            ),
         )
         .add_observer(
             |_trigger: Trigger<EndGame>,
@@ -106,9 +99,12 @@ struct ScoreText;
 
 fn setup(
     mut commands: Commands,
-    assets: Res<MyAssets>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<BackgroundMaterial>>,
+    mut texture_atlas_layouts: ResMut<
+        Assets<TextureAtlasLayout>,
+    >,
+    asset_server: Res<AssetServer>,
 ) {
     commands.spawn((
         Camera2d,
@@ -127,17 +123,39 @@ fn setup(
             CANVAS_SIZE.x,
         ))),
         MeshMaterial2d(materials.add(BackgroundMaterial {
-            color_texture: assets.background.clone(),
+            color_texture: asset_server.load_with_settings(
+                "background_color_grass.png",
+                |settings: &mut ImageLoaderSettings| {
+                    settings.sampler =
+                        ImageSampler::Descriptor(
+                            ImageSamplerDescriptor {
+                                address_mode_u: bevy::image::ImageAddressMode::Repeat,
+                                ..default()
+                            },
+                        )
+                },
+            ),
         })),
     ));
+
+    let texture = asset_server.load("corgi.png");
+    let layout = TextureAtlasLayout::from_grid(
+        UVec2::splat(500),
+        12,
+        1,
+        None,
+        None,
+    );
+    let texture_atlas_layout =
+        texture_atlas_layouts.add(layout);
 
     commands.spawn((
         Sprite {
             flip_x: true,
             custom_size: Some(Vec2::splat(CORGI_SIZE)),
-            image: assets.corgi.clone(),
+            image: texture,
             texture_atlas: Some(TextureAtlas {
-                layout: assets.corgi_layout.clone(),
+                layout: texture_atlas_layout,
                 index: 0,
             }),
             ..default()
@@ -147,46 +165,32 @@ fn setup(
             0.1,
             TimerMode::Repeating,
         )),
-        TransformInterpolation,
         Corgi,
         Gravity,
         Velocity(0.),
     ));
 
-    commands
-        .spawn((
-            Text::default(),
-            TextLayout::new_with_justify(
-                JustifyText::Center,
-            ),
-            Node {
-                width: Val::Percent(100.),
-                padding: UiRect::all(Val::Px(10.)),
-                ..default()
-            },
-            TextColor(SLATE_950.into()),
-        ))
-        .with_child((
+    commands.spawn((
+        Text::default(),
+        TextLayout::new_with_justify(JustifyText::Center),
+        Node {
+            width: Val::Percent(100.),
+            padding: UiRect::all(Val::Px(10.)),
+            ..default()
+        },
+        TextColor(SLATE_950.into()),
+        children![(
             TextSpan::new("0"),
             (
                 TextFont {
                     font_size: 33.0,
-                    // If no font is specified, the default font (a minimal subset of FiraMono) will be used.
                     ..default()
                 },
                 TextColor(SLATE_950.into()),
             ),
             ScoreText,
-        ));
-}
-
-#[derive(
-    Default, Clone, Eq, PartialEq, Debug, Hash, States,
-)]
-enum AppState {
-    #[default]
-    AssetLoading,
-    Next,
+        )],
+    ));
 }
 
 #[derive(Component, Deref, DerefMut)]
@@ -225,7 +229,6 @@ fn gravity(
 
     for (mut transform, mut velocity) in &mut transforms {
         velocity.0 += gravity * time.delta_secs();
-        dbg!(velocity.0);
 
         transform.translation.y +=
             velocity.0 * time.delta_secs();
@@ -233,14 +236,14 @@ fn gravity(
 }
 
 fn corgi_control(
-    mut corgi: Single<&mut Velocity, With<Corgi>>,
+    mut corgi_velocity: Single<&mut Velocity, With<Corgi>>,
     buttons: Res<ButtonInput<MouseButton>>,
 ) {
     if buttons.any_just_pressed([
         MouseButton::Left,
         MouseButton::Right,
     ]) {
-        corgi.0 = 400.;
+        corgi_velocity.0 = 400.;
     }
 }
 
@@ -258,27 +261,27 @@ fn check_collisions(
     #[cfg(feature = "debug-colliders")] mut gizmos: Gizmos,
 ) {
     let corgi_collider = Aabb2d::new(
-        corgi.1.translation().truncate(),
-        corgi.1.scale().truncate() / 2.,
+        corgi.1.translation().xy(),
+        corgi.1.scale().xy() / 2.,
     );
 
     #[cfg(feature = "debug-colliders")]
     gizmos.rect_2d(
-        corgi.1.translation().truncate(),
-        corgi.0.custom_size.unwrap().xy(),
+        corgi.1.translation().xy(),
+        corgi.0.custom_size.unwrap(),
         Color::BLACK,
     );
 
     for (pipe_transform, sprite) in &pipe_segments {
         let pipe_collider = Aabb2d::new(
-            pipe_transform.translation().truncate(),
-            sprite.custom_size.unwrap().xy() / 2.,
+            pipe_transform.translation().xy(),
+            sprite.custom_size.unwrap() / 2.,
         );
 
         #[cfg(feature = "debug-colliders")]
         gizmos.rect_2d(
             pipe_transform.translation().xy(),
-            sprite.custom_size.unwrap().xy(),
+            sprite.custom_size.unwrap(),
             Color::BLACK,
         );
         if corgi_collider.intersects(&pipe_collider) {
@@ -288,8 +291,8 @@ fn check_collisions(
 
     for (pipe_transform, sprite, entity) in &pipe_gaps {
         let pipe_collider = Aabb2d::new(
-            pipe_transform.translation().truncate(),
-            sprite.custom_size.unwrap().xy() / 2.,
+            pipe_transform.translation().xy(),
+            sprite.custom_size.unwrap() / 2.,
         );
 
         #[cfg(feature = "debug-colliders")]

@@ -4,10 +4,9 @@ use bevy::{
     color::palettes::css::SEA_GREEN, prelude::*,
     time::common_conditions::on_timer,
 };
-use bevy_transform_interpolation::prelude::TransformInterpolation;
 use noise::{BasicMulti, NoiseFn, Perlin};
 
-use crate::{CANVAS_SIZE, MyAssets};
+use crate::CANVAS_SIZE;
 
 const PIPE_SPEED: f32 = 200.;
 const GAP_SIZE: f32 = 125.0;
@@ -44,11 +43,12 @@ pub struct PointsGate;
 fn spawn_pipes(
     mut commands: Commands,
     time: Res<Time>,
-    my_assets: Res<MyAssets>,
+    asset_server: Res<AssetServer>,
 ) {
     let transform =
         Transform::from_xyz(CANVAS_SIZE.x + 10.0, 0.0, 1.0);
-    let hill = my_assets.hill.clone();
+
+    let hill = asset_server.load("hill_large.png");
 
     // Pipe
     let pipe_size = Vec2::new(48.0, 146.0);
@@ -64,7 +64,6 @@ fn spawn_pipes(
         transform,
         Visibility::Visible,
         Pipe,
-        TransformInterpolation,
         children![
             (
                 Sprite {
