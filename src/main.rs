@@ -1,12 +1,30 @@
 use bevy::{prelude::*, render::camera};
 
+pub const CANVAS_SIZE: Vec2 = Vec2::new(480., 270.);
+pub const CORGI_SIZE: f32 = 25.0;
+
 fn main() -> AppExit {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, startup)
         .add_systems(Update, corgi_control)
-        .add_systems(FixedUpdate, gravity)
+        .add_systems(
+            FixedUpdate,
+            (gravity, check_in_bounds),
+        )
+        .add_observer(respawn_on_endgame)
         .run()
+}
+
+fn respawn_on_endgame(
+    _trigger: Trigger<EndGame>,
+    mut commands: Commands,
+    corgi: Single<Entity, With<Player>>,
+) {
+    commands.entity(*corgi).insert((
+        Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
+        Velocity(0.),
+    ));
 }
 
 #[derive(Component)]
@@ -30,8 +48,8 @@ fn startup(
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scaling_mode: camera::ScalingMode::AutoMax {
-                max_width: 480.,
-                max_height: 270.,
+                max_width: CANVAS_SIZE.x,
+                max_height: CANVAS_SIZE.y,
             },
             ..OrthographicProjection::default_2d()
         }),
@@ -50,7 +68,7 @@ fn startup(
     commands.spawn((
         Sprite {
             flip_x: true,
-            custom_size: Some(Vec2::splat(25.)),
+            custom_size: Some(Vec2::splat(CORGI_SIZE)),
             image: asset_server.load("corgi.png"),
             texture_atlas: Some(TextureAtlas {
                 layout: texture_atlas_layout,
@@ -90,5 +108,21 @@ fn corgi_control(
         MouseButton::Right,
     ]) {
         corgi_velocity.0 = 400.;
+    }
+}
+
+#[derive(Event)]
+struct EndGame;
+
+fn check_in_bounds(
+    corgi: Single<&Transform, With<Player>>,
+    mut commands: Commands,
+) {
+    if corgi.translation.y
+        < -CANVAS_SIZE.y / 2.0 - CORGI_SIZE
+        || corgi.translation.y
+            > CANVAS_SIZE.y / 2.0 + CORGI_SIZE
+    {
+        commands.trigger(EndGame);
     }
 }
