@@ -1,11 +1,18 @@
 use bevy::{camera, prelude::*};
 
+pub const CANVAS_SIZE: Vec2 = Vec2::new(480., 270.);
+pub const CORGI_SIZE: f32 = 25.0;
+
 fn main() -> AppExit {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, startup)
-        .add_systems(FixedUpdate, gravity)
+        .add_systems(
+            FixedUpdate,
+            (gravity, check_in_bounds),
+        )
         .add_systems(Update, corgi_control)
+        .add_observer(respawn_on_endgame)
         .run()
 }
 
@@ -19,6 +26,9 @@ struct Gravity(f32);
 #[derive(Component, Default)]
 struct Velocity(f32);
 
+#[derive(Event)]
+struct EndGame;
+
 fn startup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -30,8 +40,8 @@ fn startup(
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scaling_mode: camera::ScalingMode::AutoMax {
-                max_width: 480.,
-                max_height: 270.,
+                max_width: CANVAS_SIZE.x,
+                max_height: CANVAS_SIZE.y,
             },
             ..OrthographicProjection::default_2d()
         }),
@@ -50,7 +60,7 @@ fn startup(
     commands.spawn((
         Sprite {
             flip_x: true,
-            custom_size: Some(Vec2::splat(25.)),
+            custom_size: Some(Vec2::splat(CORGI_SIZE)),
             image: asset_server.load("corgi.png"),
             texture_atlas: Some(TextureAtlas {
                 layout: texture_atlas_layout,
@@ -58,7 +68,7 @@ fn startup(
             }),
             ..default()
         },
-        Transform::from_xyz(0.0, 0.0, 1.0),
+        Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
         Player,
     ));
 }
@@ -91,4 +101,28 @@ fn corgi_control(
     ]) {
         corgi_velocity.0 = 400.;
     }
+}
+
+fn check_in_bounds(
+    corgi: Single<&Transform, With<Player>>,
+    mut commands: Commands,
+) {
+    if corgi.translation.y
+        < -CANVAS_SIZE.y / 2.0 - CORGI_SIZE
+        || corgi.translation.y
+            > CANVAS_SIZE.y / 2.0 + CORGI_SIZE
+    {
+        commands.trigger(EndGame);
+    }
+}
+
+fn respawn_on_endgame(
+    _trigger: On<EndGame>,
+    mut commands: Commands,
+    corgi: Single<Entity, With<Player>>,
+) {
+    commands.entity(*corgi).insert((
+        Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
+        Velocity(0.),
+    ));
 }
