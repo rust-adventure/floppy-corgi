@@ -1,10 +1,17 @@
-use bevy::color::palettes::tailwind::{RED_400, SLATE_50};
 use bevy::{
     camera::ScalingMode,
+    image::ImageAddressMode,
     math::bounding::{
         Aabb2d, BoundingCircle, IntersectsVolume,
     },
     prelude::*,
+    render::render_resource::AsBindGroup,
+    shader::ShaderRef,
+    sprite_render::{Material2d, Material2dPlugin},
+};
+use bevy::{
+    color::palettes::tailwind::RED_400,
+    image::ImageLoaderSettings,
 };
 use flappy_bird::*;
 
@@ -12,7 +19,11 @@ fn main() -> AppExit {
     App::new()
         .init_resource::<Score>()
         .add_plugins(DefaultPlugins)
-        .add_plugins(PipePlugin)
+        .add_plugins((
+            PipePlugin,
+            Material2dPlugin::<BackgroundMaterial>::default(
+            ),
+        ))
         .add_systems(Startup, startup)
         .add_systems(
             FixedUpdate,
@@ -67,6 +78,8 @@ fn startup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut config_store: ResMut<GizmoConfigStore>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<BackgroundMaterial>>,
 ) {
     let (config, _) = config_store
         .config_mut::<DefaultGizmoConfigGroup>();
@@ -88,6 +101,7 @@ fn startup(
         Sprite {
             custom_size: Some(Vec2::splat(PLAYER_SIZE)),
             image: asset_server.load("bevy-bird.png"),
+            color: Srgba::hex("#282828").unwrap().into(),
             ..default()
         },
         Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
@@ -105,8 +119,28 @@ fn startup(
             font_size: 33.0,
             ..default()
         },
-        TextColor(SLATE_50.into()),
+        TextColor(Srgba::hex("#282828").unwrap().into()),
         ScoreText,
+    ));
+
+    commands.spawn((
+        Mesh2d(meshes.add(Rectangle::new(
+            CANVAS_SIZE.x,
+            CANVAS_SIZE.x,
+        ))),
+        MeshMaterial2d(materials.add(BackgroundMaterial {
+            color_texture: asset_server.load_with_settings(
+                "background_color_grass.png",
+                |settings: &mut ImageLoaderSettings| {
+                    settings
+                        .sampler
+                        .get_or_init_descriptor()
+                        .set_address_mode(
+                            ImageAddressMode::Repeat,
+                        );
+                },
+            ),
+        })),
     ));
 }
 
@@ -237,5 +271,18 @@ fn score_update(
 ) {
     for mut span in &mut query {
         span.0 = score.0.to_string();
+    }
+}
+
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
+pub struct BackgroundMaterial {
+    #[texture(0)]
+    #[sampler(1)]
+    pub color_texture: Handle<Image>,
+}
+
+impl Material2d for BackgroundMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "background.wgsl".into()
     }
 }
