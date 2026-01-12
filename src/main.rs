@@ -1,11 +1,10 @@
 use bevy::{camera::ScalingMode, prelude::*};
-
-pub const CANVAS_SIZE: Vec2 = Vec2::new(480., 270.);
-pub const PLAYER_SIZE: f32 = 25.0;
+use flappy_bird::*;
 
 fn main() -> AppExit {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugins(PipePlugin)
         .add_systems(Startup, startup)
         .add_systems(
             FixedUpdate,
