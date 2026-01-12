@@ -1,4 +1,11 @@
-use bevy::{camera::ScalingMode, prelude::*};
+use bevy::color::palettes::tailwind::RED_400;
+use bevy::{
+    camera::ScalingMode,
+    math::bounding::{
+        Aabb2d, BoundingCircle, IntersectsVolume,
+    },
+    prelude::*,
+};
 use flappy_bird::*;
 
 fn main() -> AppExit {
@@ -8,7 +15,12 @@ fn main() -> AppExit {
         .add_systems(Startup, startup)
         .add_systems(
             FixedUpdate,
-            (gravity, check_in_bounds),
+            (
+                gravity,
+                check_in_bounds,
+                check_collisions,
+            )
+                .chain(),
         )
         .add_systems(Update, controls)
         .add_observer(respawn_on_endgame)
@@ -31,7 +43,12 @@ struct EndGame;
 fn startup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut config_store: ResMut<GizmoConfigStore>,
 ) {
+    let (config, _) = config_store
+        .config_mut::<DefaultGizmoConfigGroup>();
+    config.enabled = true;
+
     commands.spawn((
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
@@ -106,4 +123,69 @@ fn respawn_on_endgame(
         Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
         Velocity(0.),
     ));
+}
+
+fn check_collisions(
+    mut commands: Commands,
+    player: Single<(&Sprite, Entity), With<Player>>,
+    pipe_segments: Query<
+        (&Sprite, Entity),
+        Or<(With<PipeTop>, With<PipeBottom>)>,
+    >,
+    pipe_gaps: Query<(&Sprite, Entity), With<PointsGate>>,
+    mut gizmos: Gizmos,
+    transform_helper: TransformHelper,
+) -> Result<()> {
+    let player_transform = transform_helper
+        .compute_global_transform(player.1)?;
+    let player_collider = BoundingCircle::new(
+        player_transform.translation().xy(),
+        PLAYER_SIZE / 2.,
+    );
+
+    gizmos.circle_2d(
+        player_transform.translation().xy(),
+        PLAYER_SIZE / 2.,
+        RED_400,
+    );
+
+    for (sprite, entity) in &pipe_segments {
+        let pipe_transform = transform_helper
+            .compute_global_transform(entity)?;
+        let pipe_collider = Aabb2d::new(
+            pipe_transform.translation().xy(),
+            sprite.custom_size.unwrap() / 2.,
+        );
+
+        gizmos.rect_2d(
+            pipe_transform.translation().xy(),
+            sprite.custom_size.unwrap(),
+            RED_400,
+        );
+        if player_collider.intersects(&pipe_collider) {
+            commands.trigger(EndGame);
+        }
+    }
+
+    for (sprite, entity) in &pipe_gaps {
+        let gap_transform = transform_helper
+            .compute_global_transform(entity)?;
+        let gap_collider = Aabb2d::new(
+            gap_transform.translation().xy(),
+            sprite.custom_size.unwrap() / 2.,
+        );
+
+        gizmos.rect_2d(
+            gap_transform.translation().xy(),
+            sprite.custom_size.unwrap().xy(),
+            RED_400,
+        );
+
+        if player_collider.intersects(&gap_collider) {
+            info!("score a point!");
+            commands.entity(entity).despawn();
+        }
+    }
+
+    Ok(())
 }
