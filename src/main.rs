@@ -1,4 +1,4 @@
-use bevy::color::palettes::tailwind::RED_400;
+use bevy::color::palettes::tailwind::{RED_400, SLATE_50};
 use bevy::{
     camera::ScalingMode,
     math::bounding::{
@@ -10,6 +10,7 @@ use flappy_bird::*;
 
 fn main() -> AppExit {
     App::new()
+        .init_resource::<Score>()
         .add_plugins(DefaultPlugins)
         .add_plugins(PipePlugin)
         .add_systems(Startup, startup)
@@ -22,8 +23,21 @@ fn main() -> AppExit {
             )
                 .chain(),
         )
-        .add_systems(Update, controls)
+        .add_systems(
+            Update,
+            (
+                controls,
+                score_update
+                    .run_if(resource_changed::<Score>),
+            ),
+        )
         .add_observer(respawn_on_endgame)
+        .add_observer(
+            |_trigger: On<ScorePoint>,
+             mut score: ResMut<Score>| {
+                score.0 += 1;
+            },
+        )
         .run()
 }
 
@@ -39,6 +53,15 @@ struct Velocity(f32);
 
 #[derive(Event)]
 struct EndGame;
+
+#[derive(Resource, Default)]
+struct Score(u32);
+
+#[derive(Event)]
+pub struct ScorePoint;
+
+#[derive(Component)]
+struct ScoreText;
 
 fn startup(
     mut commands: Commands,
@@ -68,6 +91,22 @@ fn startup(
             ..default()
         },
         Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
+    ));
+
+    commands.spawn((
+        Node {
+            width: percent(100.),
+            margin: px(20.).top(),
+            ..default()
+        },
+        Text::new("0"),
+        TextLayout::new_with_justify(Justify::Center),
+        TextFont {
+            font_size: 33.0,
+            ..default()
+        },
+        TextColor(SLATE_50.into()),
+        ScoreText,
     ));
 }
 
@@ -118,7 +157,9 @@ fn respawn_on_endgame(
     _: On<EndGame>,
     mut commands: Commands,
     player: Single<Entity, With<Player>>,
+    mut score: ResMut<Score>,
 ) {
+    score.0 = 0;
     commands.entity(*player).insert((
         Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
         Velocity(0.),
@@ -182,10 +223,19 @@ fn check_collisions(
         );
 
         if player_collider.intersects(&gap_collider) {
-            info!("score a point!");
+            commands.trigger(ScorePoint);
             commands.entity(entity).despawn();
         }
     }
 
     Ok(())
+}
+
+fn score_update(
+    mut query: Query<&mut Text, With<ScoreText>>,
+    score: Res<Score>,
+) {
+    for mut span in &mut query {
+        span.0 = score.0.to_string();
+    }
 }
