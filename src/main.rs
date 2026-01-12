@@ -40,6 +40,7 @@ fn main() -> AppExit {
                 controls,
                 score_update
                     .run_if(resource_changed::<Score>),
+                enforce_bird_direction,
             ),
         )
         .add_observer(respawn_on_endgame)
@@ -83,7 +84,7 @@ fn startup(
 ) {
     let (config, _) = config_store
         .config_mut::<DefaultGizmoConfigGroup>();
-    config.enabled = true;
+    config.enabled = false;
 
     commands.spawn((
         Camera2d,
@@ -285,4 +286,17 @@ impl Material2d for BackgroundMaterial {
     fn fragment_shader() -> ShaderRef {
         "background.wgsl".into()
     }
+}
+
+fn enforce_bird_direction(
+    mut player: Single<
+        (&mut Transform, &Velocity),
+        With<Player>,
+    >,
+) {
+    let calculated_velocity =
+        Vec2::new(PIPE_SPEED, player.1.0);
+    player.0.rotation = Quat::from_rotation_z(
+        calculated_velocity.to_angle(),
+    );
 }

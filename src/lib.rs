@@ -9,7 +9,7 @@ pub const CANVAS_SIZE: Vec2 = Vec2::new(480., 270.);
 pub const PLAYER_SIZE: f32 = 25.0;
 const PIPE_SIZE: Vec2 = Vec2::new(32., CANVAS_SIZE.y);
 const GAP_SIZE: f32 = 100.0;
-const PIPE_SPEED: f32 = 200.0;
+pub const PIPE_SPEED: f32 = 200.0;
 
 pub struct PipePlugin;
 
@@ -43,6 +43,7 @@ pub struct PointsGate;
 fn spawn_pipes(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    time: Res<Time>,
 ) {
     let image = asset_server.load_with_settings(
         "pipe.png",
@@ -65,7 +66,10 @@ fn spawn_pipes(
 
     let transform =
         Transform::from_xyz(CANVAS_SIZE.x / 2., 0.0, 1.0);
-    let gap_y_position = 0.;
+    let gap_y_position = (time.elapsed_secs() * 4.2309875)
+        .sin()
+        * CANVAS_SIZE.y
+        / 4.;
     let pipe_offset = PIPE_SIZE.y / 2.0 + GAP_SIZE / 2.0;
 
     commands.spawn((
@@ -88,6 +92,7 @@ fn spawn_pipes(
                 PipeTop
             ),
             (
+                Visibility::Hidden,
                 Sprite {
                     color: Color::WHITE,
                     custom_size: Some(Vec2::new(
