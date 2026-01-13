@@ -4,7 +4,29 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.18.0-rc.2"
+bevy = { version = "0.18.0-rc.2", default-features = false, features = [
+    # ui
+    "ui_api",
+    "ui_bevy_render",
+    # "default_app",
+    # "async_executor",
+    "bevy_asset",
+    # "bevy_input_focus",
+    "bevy_log",
+    "bevy_state",
+    "bevy_window",
+    # "custom_cursor",
+    # "reflect_auto_register",
+    # 2d
+    "2d_bevy_render",
+    # platform
+    # "default_platform",
+    "bevy_gilrs",
+    "bevy_winit",
+    "default_font",
+    "std",
+    "webgl2",
+] }
 # Set max log levels. This helps avoid unwanted low-severity log spam, which can affect performance.
 log = { version = "0.4", features = [
     "max_level_debug",
@@ -43,3 +65,6 @@ codegen-units = 1
 # Do a second optimization pass over the entire program, including dependencies.
 # Slows compile times, marginal improvements.
 lto = "thin"
+
+[package.metadata.bevy_cli.web.release]
+wasm-opt = ["-Oz"]

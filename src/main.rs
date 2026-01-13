@@ -1,4 +1,5 @@
 use bevy::{
+    asset::AssetMetaCheck,
     camera::ScalingMode,
     image::ImageAddressMode,
     math::bounding::{
@@ -18,7 +19,27 @@ use flappy_bird::*;
 fn main() -> AppExit {
     App::new()
         .init_resource::<Score>()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(
+            DefaultPlugins
+                .set(AssetPlugin {
+                    meta_check: AssetMetaCheck::Never,
+                    file_path:
+                        "/static/live-games/flappy-bird/assets"
+                            .to_string(),
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        canvas: Some(
+                            "#flappy-bird-canvas"
+                                .to_string(),
+                        ),
+                        fit_canvas_to_parent: true,
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        )
         .add_plugins((
             PipePlugin,
             Material2dPlugin::<BackgroundMaterial>::default(
