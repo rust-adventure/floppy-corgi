@@ -43,13 +43,14 @@ fn main() -> AppExit {
 }
 
 #[derive(SceneComponent, Default, Clone)]
-#[require(Gravity(1000.), Velocity)]
 struct Player;
 
 impl Player {
     fn scene() -> impl Scene {
         bsn! {
             // Player
+            Gravity(1000.)
+            Velocity
             Sprite {
                 custom_size: Vec2::splat(PLAYER_SIZE),
                 image: "bevy-bird.png",
@@ -62,10 +63,10 @@ impl Player {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct Gravity(f32);
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 struct Velocity(f32);
 
 #[derive(Event)]
