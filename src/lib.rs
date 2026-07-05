@@ -36,13 +36,15 @@ pub struct PipeBottom;
 pub struct PointsGate;
 
 fn spawn_pipes(mut commands: Commands, asset_server: Res<AssetServer>, time: Res<Time>) {
-    let image =
-        asset_server.load_with_settings("pipe.png", |settings: &mut ImageLoaderSettings| {
+    let image = asset_server
+        .load_builder()
+        .with_settings(|settings: &mut ImageLoaderSettings| {
             settings
                 .sampler
                 .get_or_init_descriptor()
                 .set_filter(bevy::image::ImageFilterMode::Nearest);
-        });
+        })
+        .load("pipe.png");
 
     let image_mode = SpriteImageMode::Sliced(TextureSlicer {
         border: BorderRect::axes(8., 19.),
@@ -55,10 +57,12 @@ fn spawn_pipes(mut commands: Commands, asset_server: Res<AssetServer>, time: Res
     let pipe_offset = PIPE_SIZE.y / 2.0 + GAP_SIZE / 2.0;
 
     commands.spawn_scene(bsn! {
+        #Pipe
+        Pipe
         template_value(transform)
         Visibility::Visible
-        Pipe
         Children[
+            #PipeTop
             PipeTop
             Sprite {
                 image: {image.clone()},
@@ -71,6 +75,7 @@ fn spawn_pipes(mut commands: Commands, asset_server: Res<AssetServer>, time: Res
                 1.0,
             ),
 
+            #PointsGate
             PointsGate
             Visibility::Hidden
             Sprite {
@@ -85,6 +90,7 @@ fn spawn_pipes(mut commands: Commands, asset_server: Res<AssetServer>, time: Res
                 1.0,
             ),
 
+            #PipeBottom
             PipeBottom
             Sprite {
                 image,
