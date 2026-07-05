@@ -38,9 +38,25 @@ fn main() -> AppExit {
         .run()
 }
 
-#[derive(Component, Default, Clone)]
+#[derive(SceneComponent, Default, Clone)]
 #[require(Gravity(1000.), Velocity)]
 struct Player;
+
+impl Player {
+    fn scene() -> impl Scene {
+        bsn! {
+            // Player
+            Sprite {
+                custom_size: Vec2::splat(PLAYER_SIZE),
+                image: "bevy-bird.png",
+                color: {Color::from(Srgba::hex("#282828").unwrap())},
+            }
+            Transform {
+                translation: Vec3::new(-CANVAS_SIZE.x / 4.0, 0.0, 1.0)
+            }
+        }
+    }
+}
 
 #[derive(Component)]
 struct Gravity(f32);
@@ -71,15 +87,7 @@ fn startup_scene() -> impl SceneList {
             ..OrthographicProjection::default_2d()
         })),
 
-        Player
-        Sprite {
-            custom_size: Vec2::splat(PLAYER_SIZE),
-            image: "bevy-bird.png",
-            color: {Color::from(Srgba::hex("#282828").unwrap())},
-        }
-        Transform {
-            translation: Vec3::new(-CANVAS_SIZE.x / 4.0, 0.0, 1.0)
-        },
+        @Player,
 
         Node {
             width: percent(100.),
@@ -155,10 +163,10 @@ fn respawn_on_endgame(
     mut score: ResMut<Score>,
 ) {
     score.0 = 0;
-    commands.entity(*player).insert((
-        Transform::from_xyz(-CANVAS_SIZE.x / 4.0, 0.0, 1.0),
-        Velocity(0.),
-    ));
+    commands.entity(*player).despawn();
+    commands.spawn_scene(bsn! {
+        @Player
+    });
 }
 
 fn check_collisions(
