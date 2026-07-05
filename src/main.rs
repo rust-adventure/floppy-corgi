@@ -13,6 +13,10 @@ use flappy_bird::*;
 fn main() -> AppExit {
     App::new()
         .init_resource::<Score>()
+        // .insert_resource(GlobalUiDebugOptions {
+        //     enabled: true,
+        //     ..default()
+        // })
         .add_plugins(DefaultPlugins)
         .add_plugins((
             PipePlugin,
@@ -78,6 +82,7 @@ struct ScoreText;
 
 fn startup_scene() -> impl SceneList {
     bsn_list! {
+        #DefaultCamera
         Camera2d
         template_value(Projection::Orthographic(OrthographicProjection {
             scaling_mode: ScalingMode::AutoMax {
@@ -89,21 +94,22 @@ fn startup_scene() -> impl SceneList {
 
         @Player,
 
+        #ScoreText
+        ScoreText
         Node {
             width: percent(100.),
             margin: {px(20.).top()},
-            justify_content: JustifyContent::Center
         }
-        Children [
-            Text::new("0")
-            TextFont {
-                font_size: FontSize::Px(33.0),
-            }
-            TextColor({
-                Srgba::hex("#282828").unwrap()
-            })
-            ScoreText,
-        ],
+        Text::new("0")
+        TextLayout {
+            justify: Justify::Center
+        }
+        TextFont {
+            font_size: FontSize::Px(33.0),
+        }
+        TextColor({
+            Srgba::hex("#282828").unwrap()
+        }),
 
         Mesh2d(asset_value(Rectangle::new(CANVAS_SIZE.x, CANVAS_SIZE.x)))
         template(|context| {
